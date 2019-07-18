@@ -689,11 +689,53 @@ echo --------------------------------Begin to install Herokuish and Dokku-------
 sleep 5
 yum install -y herokuish dokku
 dokku plugin:install-dependecies --core
-dokku 
+dokku
 if [`echo $?` -eq 0 ];then
 	echo Dokku installed successfully
 else
 	echo please check again
 fi
 
+echo "-------------------------------begin to setup the Nginx service----------------------------------------"
+sleep 5
+NginxService=/etc/systemd/system/multi-user.target.wants/nginx.service
+touch $NginxService
+cat > $NginxService <<EOF
+[Unit]
+Description=The nginx HTTP and reverse proxy server
+After=network.target remote-fs.target nss-lookup.target
 
+[Service]
+Type=forking
+PIDFile=/run/nginx.pid
+# Nginx will fail to start if /run/nginx.pid already exists but has the wrong
+# SELinux context. This might happen when running `nginx -t` from the cmdline.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1268621
+ExecStartPre=/usr/bin/rm -f /run/nginx.pid
+ExecStartPre=/usr/sbin/nginx -t
+ExecStart=/usr/sbin/nginx
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=5
+KillMode=process
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl restart nginx.Service
+if [`echo $?` -eq 0 ];then
+	echo Nginx installed successfully
+else
+	echo please check Nginx Service
+fi
+
+echo "----------------Close the selinux and firewalld------------------------------"
+systemctl stop firewalld.Service
+systemctl disable firewalld.Service
+sed -i "s/enforcing/disabled/g" /etc/selinux/config
+setenforce 0
+echo "----------------------firewall and selinux are closed--------------------------------------------"
+
+echo "Everything is ok now, please start your dokku journey"
