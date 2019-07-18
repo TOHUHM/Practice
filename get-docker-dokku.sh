@@ -385,7 +385,7 @@ do_install() {
 				$sh_c "apt-get install -y -qq --no-install-recommends docker-ce$pkg_version >/dev/null"
 			)
 			echo_docker_as_nonroot
-			exit 0
+			continue
 			;;
 		centos|fedora)
 			yum_repo="$DOWNLOAD_URL/linux/$lsb_dist/$REPO_FILE"
@@ -455,7 +455,7 @@ do_install() {
 				$sh_c "$pkg_manager install -y -q docker-ce$pkg_version"
 			)
 			echo_docker_as_nonroot
-			exit 0
+			continue
 			;;
 		*)
 			echo
@@ -464,7 +464,7 @@ do_install() {
 			exit 1
 			;;
 	esac
-	exit 1
+	continue
 }
 
 # wrapped up in a function so that we have some protection against only getting
@@ -724,15 +724,15 @@ PrivateTmp=true
 WantedBy=multi-user.target
 EOF
 
-systemctl restart nginx.Service
-if [`echo $?` -eq 0 ];then
+systemctl restart nginx.service
+if [ $? -eq 0 ];then
 	echo Nginx installed successfully
 else
 	echo please check Nginx Service
 fi
 
 echo "----------------Close the selinux and firewalld------------------------------"
-systemctl stop firewalld.Service
+systemctl stop firewalld.service
 systemctl disable firewalld.service
 sed -i "s/enforcing/disabled/g" /etc/selinux/config
 setenforce 0
