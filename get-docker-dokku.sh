@@ -733,7 +733,7 @@ fi
 
 echo "----------------Close the selinux and firewalld------------------------------"
 systemctl stop firewalld.Service
-systemctl disable firewalld.Service
+systemctl disable firewalld.service
 sed -i "s/enforcing/disabled/g" /etc/selinux/config
 setenforce 0
 echo "----------------------firewall and selinux are closed--------------------------------------------"
