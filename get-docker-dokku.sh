@@ -725,6 +725,7 @@ WantedBy=multi-user.target
 EOF
 
 systemctl restart nginx.service
+echo test
 if [ $? -eq 0 ];then
 	echo Nginx installed successfully
 else
