@@ -688,7 +688,7 @@ echo --------------------------------Dokku Environment and Repository are config
 echo --------------------------------Begin to install Herokuish and Dokku-----------------------------------
 sleep 5
 yum install -y herokuish dokku
-dokku plugin:install-dependecies --core
+dokku plugin:install-dependencies --core
 dokku
 if [`echo $?` -eq 0 ];then
 	echo Dokku installed successfully
