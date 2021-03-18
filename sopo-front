@@ -1,0 +1,119 @@
+#!/usr/bin/env groovy
+
+import java.text.SimpleDateFormat
+@Library('custom-lib@feat_cn_methods') _
+
+
+def proxy = 'http://proxy-internet-aws-china-production.subsidia.org:3128'
+// def target_server1 = 10.55.10.196:/data/www/web-sopo-v2/
+// def target_server2 = 10.55.10.202:/data/www/web-sopo-v2/
+
+def job_name = URLDecoder.decode(env.JOB_NAME)
+def _subject = "$job_name - Build # ${env.BUILD_NUMBER} - "
+def _to   = 'jason.xu.partner@decathlon.com'
+def _body = "Click <a href='${env.BUILD_URL}'>$job_name</a> to check the console output."
+
+dateFormat = new SimpleDateFormat("yyyyMMdd")
+def datetimeFormat = new SimpleDateFormat("yyyyMMddHHmmss")
+def date = new Date()
+def nowdate = dateFormat.format(date)
+def nowdatetime = datetimeFormat.format(date)
+
+def remote_dir = "/data/www/web-sopo-v2"
+def local_dir = "docs"
+def sopo_tar_gz = "${local_dir}-${nowdate}.tar.gz"
+
+def remote = [:]
+remote.name = 'sopo-sg-pr-host_test'
+remote.host = '10.55.10.205'
+remote.user = 'sopodeploy'
+
+withCredentials([string(credentialsId: 'sopo_host_ssh_jxu_password', variable: 'password')]) {
+    remote.password = password
+}
+remote.allowAnyHosts = true
+
+
+
+pipeline{
+
+    agent any
+
+    options {
+        // Basic options
+        timestamps()
+        disableConcurrentBuilds()
+    }
+    stages {
+
+        stage('Build Nodejs static'){
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'develop'
+                }
+            }
+            steps {
+                script {
+                    def proxy_production = "$proxy"
+                    sh "npm config set proxy $proxy_production"
+                    sh "npm install --unsafe-perm"
+                    sh "npm audit fix"
+                    sh "npm run build"
+                }
+            }
+        }
+
+
+        stage('Pre-Deploy') {
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'develop'
+                }
+            }
+            steps{
+                script {
+
+                    /* copy the buit files to target server.
+                    */
+                    sh "rm -rf *.tar.gz"
+                    sh "tar -czf ${sopo_tar_gz} ${local_dir}"
+                    sshPut remote: remote, from: "${sopo_tar_gz}", into: "${remote_dir}"
+
+            //        sh "scp $Node_build_dir $target_server2"
+
+                    echo "Nodejs artifact copied to target server"
+                    }
+                }
+            }
+        stage('Deploy') {
+            when {
+            anyOf {
+              branch 'master'
+              branch 'develop'
+            }
+            }
+            steps{
+            sshCommand remote: remote, command: "sudo su - -c 'cd ${remote_dir} && tar -czf code_backup/${local_dir}-${nowdate}.tar.gz ${local_dir}'", sudo: true
+            sshCommand remote: remote, command: "sudo su - -c 'cd ${remote_dir} && /bin/tar -xzf ${sopo_tar_gz} -C ${local_dir} --strip-components 1'", sudo: true
+            }
+            }
+    }
+
+
+    post {
+
+        success {
+            emailext subject: "$_subject Successful!", to: "$_to", body: "$_body"
+        }
+
+        failure {
+            emailext subject: "$_subject Failed!", to: "$_to", body: "$_body"
+        }
+
+        always {
+            cleanWs cleanWhenAborted: false, cleanWhenFailure: false, cleanWhenNotBuilt: false, cleanWhenUnstable: false, notFailBuild: true
+        }
+    }
+}
